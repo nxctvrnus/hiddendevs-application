@@ -164,15 +164,14 @@ function CombatService:Attack(HitObjects)
 
 		--// Must use task.wait() to ensure proper timing
 		task.wait(RelevantWeapon.SwingTime / 2)
-		
-		if not self.Feinted then
-			--// Make sure we scan everything in range as enemy can't do the homework beforehand
-			if not HitObjects then
-				HitObjects = HitboxService:Hitbox(Vector3.new(RelevantWeapon.Range, RelevantWeapon.Range, RelevantWeapon.Range), self.Object.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4), self.Object)
-			end
 
-			for _, v in pairs(HitObjects) do
-				--// Add 2.8 for leniency
+		--// Make sure we scan everything in range as enemy can't do the homework beforehand
+		if not HitObjects then
+			HitObjects = HitboxService:Hitbox(Vector3.new(RelevantWeapon.Range, RelevantWeapon.Range, RelevantWeapon.Range), self.Object.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4), self.Object)
+		end
+		
+		for _, v in pairs(HitObjects) do
+			if not self.Feinted then
 				if (self.Object:GetPivot().Position - v.HumanoidRootPart.Position).Magnitude < RelevantWeapon.Range + 2.8 then
 					if CombatData[v] then
 						if CombatData[v].Parrying then
@@ -187,6 +186,7 @@ function CombatService:Attack(HitObjects)
 							AudioService:CreateSound(SoundService.Weapons.Combat.Block, v)
 							CombatData[v].Posture += RelevantWeapon.PostureDamage
 							if CombatData[v].Posture >= 100 then
+								v.Humanoid:TakeDamage(RelevantWeapon.Damage)
 								task.spawn(function()
 									AudioService:CreateSound(SoundService.Weapons.Combat.Guardbreak, v)
 									AnimationsService:PlayAnimation(v, Animations.Combat.Guardbroken, 'Guardbroken')
@@ -221,7 +221,11 @@ function CombatService:Attack(HitObjects)
 					Reject('too far from target')
 					return
 				end
+			else
+				Reject('feinted')
+				return
 			end
+		end
 			
 			self.LastHit = tick()
 			self.Attacking = false
