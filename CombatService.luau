@@ -24,6 +24,7 @@ local CachedWeaponData = {}
 local CachedEnemyData = {}
 local CombatData = {}
 
+--// Store info from these modules for future reference
 for _, v in ipairs(ReplicatedStorage.Assets.CombatInfo:GetChildren()) do
 	CachedWeaponData[v.Name] = require(v)
 end
@@ -32,6 +33,7 @@ for _, v in ipairs(script.EnemyData:GetChildren()) do
 	CachedEnemyData[v.Name] = require(v)
 end
 
+--// Get weapon
 local function LocateWeapon(Object: Model)
 	for _, v in Object:GetChildren() do
 		if v:GetAttribute('Weapon') then
@@ -98,6 +100,7 @@ function CombatService:Init(Object, SpawnPosition: Vector3?)
 	
 	task.spawn(function()
 		if self.Posture > 0 then
+			--// Math clamp to keep it strictly within 0-100 range
 			self.Posture = math.clamp(self.Posture - 5, 0, 100)
 		end
 		task.wait(1)
@@ -114,7 +117,8 @@ function CombatService:Attack(HitObjects)
 		warn(`CombatService rejected attack request from {self.Object:GetFullName()} {self.Player and self.Player.UserId or '(Enemy)'}: {Reason}`)
 		self.Attacking = false
 	end
-	
+
+	--// Get weapon depending whether is player or enemy
 	local Weapon = LocateWeapon(self.Object) or self.Weapon
 	
 	if Weapon and not self.Attacking and not self.Blocking and not self.Parrying and self.Posture < 100 then
@@ -141,7 +145,8 @@ function CombatService:Attack(HitObjects)
 		if self.Combo <= 4 then
 			self.Combo += 1
 		end
-		
+
+		--// Need to play animation for enemy if enemy is attacking
 		if self.Object:GetAttribute('Enemy') then
 			if self.Combo == 1 then
 				AnimationsService:PlayAnimation(self.Object, RelevantAnimations.Animations.Swing1, 'Swing1')
@@ -156,15 +161,18 @@ function CombatService:Attack(HitObjects)
 				AnimationsService:PlayAnimation(self.Object,RelevantAnimations.Animations.Swing4, 'Swing4')
 			end
 		end
-		
+
+		--// Must use task.wait() to ensure proper timing
 		task.wait(RelevantWeapon.SwingTime / 2)
 		
 		if not self.Feinted then
+			--// Make sure we scan everything in range as enemy can't do the homework beforehand
 			if not HitObjects then
 				HitObjects = HitboxService:Hitbox(Vector3.new(RelevantWeapon.Range, RelevantWeapon.Range, RelevantWeapon.Range), self.Object.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4), self.Object)
 			end
 
 			for _, v in pairs(HitObjects) do
+				--// Add 2.8 for leniency
 				if (self.Object:GetPivot().Position - v.HumanoidRootPart.Position).Magnitude < RelevantWeapon.Range + 2.8 then
 					if CombatData[v] then
 						if CombatData[v].Parrying then
