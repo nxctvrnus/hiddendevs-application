@@ -1,3 +1,5 @@
+27 08 2026 made by nxctvrnus all rights not reserved
+
 local CombatService = {}
 
 CombatService.__index = CombatService
