@@ -82,7 +82,8 @@ function CombatService:Init(Object, SpawnPosition: Vector3?)
 	else
 		self.Player = Players:GetPlayerFromCharacter(Object)
 	end
-	
+
+	--// Must use once to not create problem with memory later in case
 	Object.Humanoid.Died:Once(function()
 		CombatData[Object] = nil
 		if Object:GetAttribute('Enemy') then
