@@ -33,7 +33,7 @@ for _, v in ipairs(script.EnemyData:GetChildren()) do
 	CachedEnemyData[v.Name] = require(v)
 end
 
---// Get weapon
+--// Get the currently held weapon by Object, likely to be mostly used on players
 local function LocateWeapon(Object: Model)
 	for _, v in Object:GetChildren() do
 		if v:GetAttribute('Weapon') then
