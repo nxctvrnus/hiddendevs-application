@@ -1,4 +1,4 @@
---// 27 08 2026 made by nxctvrnus all rights not reserved
+--// made by: discord - sunrvtcxn, roblox - nxctvrnus
 --// when you get into the game, you might need to get into the dungeon part, to do so please go to the hallway with elevators
 --// for the record my alt is BigBotGuard (named after BigGuard20000 which is my past name) but my main account is nxctvrnus, i dont know why im verified under that in hiddendevs
 
