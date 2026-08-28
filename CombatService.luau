@@ -56,6 +56,7 @@ function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition 
 	self.Parrying = false
 	
 	local ParentDetector: RBXScriptConnection = nil
+	local HumanoidDeathDetector: RBXScriptConnection = nil
 	local HuntTask: RBXScriptConnection = nil
 	
 	--// Check if an enemy is being registered
@@ -68,14 +69,17 @@ function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition 
 		Object.Parent = workspace
 		--// Make enemy act on its own
 		HuntTask = task.spawn(function()
+			--// Every half second check if someone is in detection range
 			while task.wait(.5) do
 				for _, v in Players:GetPlayers() do
+					--// If someone is within detection range then lock onto them until they're dead
 					if (Object.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude < CachedEnemyData[Object.Name].DetectionRange then
 						local Character = v.Character
+						--// If they're close enough then attack, if they're not BUT they're still within detection range then go to them, if both scenarios aren't happening then chill out
 						repeat
 							if (Object.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude < CachedWeaponData[self.Weapon].Range + 2 then
 								self:Attack()
-							elseif (Object.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude < CachedEnemyData[Object.Name].DetectionRange - 2 then
+							elseif (Object.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude < CachedEnemyData[Object.Name].DetectionRange then
 								Object.Humanoid:MoveTo(Character.HumanoidRootPart.Position)
 							else
 								break
@@ -94,16 +98,20 @@ function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition 
 	--// Wipe object from CombatData if destroyed unexpectedly
 	ParentDetector = Object.AncestryChanged:Connect(function()
 		if Object.Parent == nil then
+			--// If is enemy then stop hunting players
+			if Object:GetAttribute('Enemy') then
+				task.cancel(HuntTask)
+			end
 			CombatData[Object] = nil
+			--// Disconnect connections to prevent memory leak
+			HumanoidDeathDetector:Disconnect()
 			ParentDetector:Disconnect()
 		end
 	end)
 	
-	--// Wipe object from CombatData upon death
-	Object.Humanoid.Died:Once(function()
+	--// Wipe object from CombatData upon death of its humanoid
+	HumanoidDeathDetector = Object.Humanoid.Died:Once(function()
 		CombatData[Object] = nil
-		--// Disconnect ParentDetector connection to prevent memory leak
-		ParentDetector:Disconnect()
 		--// If is enemy then stop hunting players and create cool fading away effect
 		if Object:GetAttribute('Enemy') then
 			task.cancel(HuntTask)
@@ -116,6 +124,9 @@ function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition 
 			task.wait(5)
 			Object:Destroy()
 		end
+		--// Disconnect connections to prevent memory leak
+		ParentDetector:Disconnect()
+		HumanoidDeathDetector:Disconnect()
 	end)
 	
 	--// Passively decrease posture 
@@ -198,62 +209,67 @@ function CombatService:Attack(HitObjects)
 			HitObjects = HitboxService:Hitbox(Vector3.new(RelevantWeapon.Range, RelevantWeapon.Range, RelevantWeapon.Range), self.Object.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4), self.Object)
 		end
 		
-		--// For each model that was in the hitbox check its status and continue accordingly
-		for _, v in ipairs(HitObjects) do
-			--// Sanity check
-			if not self.Feinted and (self.Object:GetPivot().Position - v.HumanoidRootPart.Position).Magnitude < RelevantWeapon.Range + 2.8 and CombatData[v] then
-				if CombatData[v].Parrying then
-					AudioService:CreateSound(SoundService.Weapons.Combat.Parry, v)
-					--// If attacker is player then let player know that they were parried, let them handle animation. Otherwise play animation for enemy
-					if self.Player then
-						Events.Parried:FireClient(self.Player)
-					else
-						AnimationsService:PlayAnimation(v, Animations.Combat.Parried, 'Parried')
-					end
-					--// Attacker was parried, reset combo and wait 1.2s before being able to do anything as punishment
-					self.Combo = 0
-					task.wait(1.2)
-				elseif CombatData[v].Blocking then
-					AudioService:CreateSound(SoundService.Weapons.Combat.Block, v)
-					CombatData[v].Posture += RelevantWeapon.PostureDamage
-					if CombatData[v].Posture >= 100 then
-						v.Humanoid:TakeDamage(RelevantWeapon.Damage)
-						AudioService:CreateSound(SoundService.Weapons.Combat.Guardbreak, v)
-						--// If v is a player then let them know they were guardbroken, let them handle animation. Otherwise play animation for enemy
-						if CombatData[v].Player then
-							Events.GuardbrokenEvent:FireClient(Players:GetPlayerFromCharacter(v))
+		if not self.Feinted then
+			--// For each model that was in the hitbox check its status and continue accordingly
+			for _, v in ipairs(HitObjects) do
+				--// Sanity check
+				if (self.Object:GetPivot().Position - v.HumanoidRootPart.Position).Magnitude < RelevantWeapon.Range + 2.8 and CombatData[v] then
+					if CombatData[v].Parrying then
+						AudioService:CreateSound(SoundService.Weapons.Combat.Parry, v)
+						--// If attacker is player then let player know that they were parried, let them handle animation. Otherwise play animation for enemy
+						if self.Player then
+							Events.Parried:FireClient(self.Player)
 						else
-							AnimationsService:PlayAnimation(v, Animations.Combat.Guardbroken, 'Guardbroken')
+							AnimationsService:PlayAnimation(v, Animations.Combat.Parried, 'Parried')
 						end
-						CombatData[v].Blocking = false
-						task.wait(1.3)
-						AnimationsService:StopAnimation(v, 'Guardbroken')
-						CombatData[v].Posture = 0
+						--// Attacker was parried, reset combo and wait 1.2s before being able to do anything as punishment
+						self.Combo = 0
+						task.wait(1.2)
+					elseif CombatData[v].Blocking then
+						AudioService:CreateSound(SoundService.Weapons.Combat.Block, v)
+						CombatData[v].Posture += RelevantWeapon.PostureDamage
+						--// Check if v's posture is large enough for a guardbreak
+						if CombatData[v].Posture >= 100 then
+							v.Humanoid:TakeDamage(RelevantWeapon.Damage)
+							AudioService:CreateSound(SoundService.Weapons.Combat.Guardbreak, v)
+							--// If v is a player then let them know they were guardbroken, let them handle animation. Otherwise play animation for enemy
+							if CombatData[v].Player then
+								Events.GuardbrokenEvent:FireClient(CombatData[v].Player)
+							else
+								AnimationsService:PlayAnimation(v, Animations.Combat.Guardbroken, 'Guardbroken')
+							end
+							CombatData[v].Blocking = false
+							task.wait(1.3)
+							AnimationsService:StopAnimation(v, 'Guardbroken')
+							CombatData[v].Posture = 0
+						end
+					else
+						--// Idle, can safely deal damage
+						v.Humanoid:TakeDamage(RelevantWeapon.Damage)
+						AudioService:CreateSound(game.SoundService.Weapons[RelevantWeapon.Name].Hit, v)
+						local RandomNumber = math.random(1, 2)
+						if RandomNumber == 1 then
+							AnimationsService:StopAnimation(v, 'Damaged2')
+							AnimationsService:PlayAnimation(v,Animations.Combat.Damaged1, 'Damaged1')
+						else
+							AnimationsService:StopAnimation(v, 'Damaged1')
+							AnimationsService:PlayAnimation(v, Animations.Combat.Damaged2, 'Damaged2')
+						end
 					end
 				else
-					v.Humanoid:TakeDamage(RelevantWeapon.Damage)
-					AudioService:CreateSound(game.SoundService.Weapons[RelevantWeapon.Name].Hit, v)
-					local RandomNumber = math.random(1, 2)
-					if RandomNumber == 1 then
-						AnimationsService:StopAnimation(v, 'Damaged2')
-						AnimationsService:PlayAnimation(v,Animations.Combat.Damaged1, 'Damaged1')
-					else
-						AnimationsService:StopAnimation(v, 'Damaged1')
-						AnimationsService:PlayAnimation(v, Animations.Combat.Damaged2, 'Damaged2')
-					end
+					Reject('Too far or target not found in CombatData')
+					return
 				end
-			elseif self.Feinted then
-				AudioService:CreateSound(SoundService.Weapons.Combat.Feint, self.Object)
-				return
-			else
-				Reject('Feinted or too far or target not found in CombatData')
-				return
 			end
+		else
+			AudioService:CreateSound(SoundService.Weapons.Combat.Feint, self.Object)
+			return
 		end
 			
 		self.LastHit = tick()
 		self.Attacking = false
 		
+		--// If is equal to or above 5 then reset to 0
 		if self.Combo >= 5 then
 			self.Combo = 0
 		end
