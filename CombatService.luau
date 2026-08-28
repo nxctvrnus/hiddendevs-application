@@ -57,7 +57,7 @@ function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition 
 	
 	local ParentDetector: RBXScriptConnection = nil
 	local HumanoidDeathDetector: RBXScriptConnection = nil
-	local HuntTask: RBXScriptConnection = nil
+	local HuntTask = nil
 	
 	--// Check if an enemy is being registered
 	if Object:GetAttribute('Enemy') then
