@@ -119,11 +119,7 @@ end
 function LayerService:DeleteChunk(id: string)
 	local Chunk = Chunks[id]
 	if Chunk then
-		for _, v in pairs(workspace:GetPartsInPart(Chunk.CenterPart)) do
-			if v.Parent and v.Parent.Name ~= 'Workspace' then
-				v.Parent:Destroy()
-			end
-		end
+		LayerService:WipeChunkEnemies(id)
 		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
 		Chunk.CenterPart:Destroy()
 		Chunks[id] = nil
@@ -231,27 +227,26 @@ function LayerService:GetChunkFromCFrame(Cf: CFrame)
 	end
 end
 
-function GetChunkEnemies(id: string)
-	local result = workspace:GetPartBoundsInBox(Chunks[id].CenterPart.CFrame, Vector3.new(center_size, center_size, center_size))
+function LayerService:GetChunkEnemies(id: string)
+	local targets = workspace:GetPartBoundsInBox(Chunks[id].CenterPart.CFrame, Vector3.new(center_size, center_size, center_size))
+	local results = {}
 
-	for _, v in pairs(result) do
+	for _, v in pairs(targets) do
 		if v:GetAttribute('Enemy') then
-			v:Destroy()
+			table.insert(results, v)
 		end
 	end
-end
-
-function WipeChunkEnemies(id: string)
-	local result = workspace:GetPartBoundsInBox(Chunks[id].CenterPart.CFrame, Vector3.new(center_size, center_size, center_size))
 	
-	for _, v in pairs(result) do
-		if v:GetAttribute('Enemy') then
-			v:Destroy()
-		end
+	return results
+end
+
+function LayerService:WipeChunkEnemies(id: string)
+	for _, v in pairs(LayerService:GetChunkEnemies(id)) do
+		v:Destroy()
 	end
 end
 
-function GetLayerInfo(index)
+function LayerService:GetLayerInfo(index)
 	return LayerInfo.Layers[index]
 end
 
