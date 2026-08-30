@@ -1,325 +1,211 @@
 --// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914
 --// when you get into the game, you might need to get into the dungeon part, to do so please go to the hallway with elevators
---// context: this is a combat handler module that supports both players and enemies
+local LayerService = {}
 
-local CombatService = {}
-
-CombatService.__index = CombatService
+LayerService.__index = LayerService
 
 --// Services
+local HttpService = game:GetService('HttpService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
-local RunService = game:GetService('RunService')
-local SoundService = game:GetService('SoundService')
-local TweenService = game:GetService('TweenService')
 local Players = game:GetService('Players')
-
-local AnimationsService = require(ReplicatedStorage.Modules.AnimationsService)
-local AudioService = require(ReplicatedStorage.Modules.AudioService)
-local HitboxService = require(ReplicatedStorage.Modules.HitboxService)
+local ServerScriptService = game:GetService('ServerScriptService')
 
 --// Variables
-local Animations = ReplicatedStorage.Assets.Animations
-local Events = ReplicatedStorage.Events.Combat
-local CachedWeaponData = {}
-local CachedEnemyData = {}
-local CombatData = {}
+local Terrain = workspace.Terrain
+local Enemies = ReplicatedStorage.Assets.Enemies
+local Events = ReplicatedStorage.Events
 
---// Store info from these modules for future reference
-for _, v in ipairs(ReplicatedStorage.Assets.CombatInfo:GetChildren()) do
-	CachedWeaponData[v.Name] = require(v)
-end
+local CombatService = require(ServerScriptService.Combat.CombatService)
+local LayerInfo = require(script.LayerInfo)
 
-for _, v in ipairs(script.EnemyData:GetChildren()) do
-	CachedEnemyData[v.Name] = require(v)
-end
+local Chunks = {}
 
---// Get the currently held weapon by Object, likely to be mostly used on players
-local function LocateWeapon(Object: Model)
-	for _, v in Object:GetChildren() do
-		if v:GetAttribute('Weapon') then
-			return v
+local cell_size = 3
+local chunk_size = 64
+local resolution = 20
+local frequency = 2
+local amplification = 2
+local seed = Random.new()
+
+local render_distance = 15
+
+LayerService.CurrentLayer = 1
+
+Events.Environment.ChangeLayer.Event:Connect(function(State: 'Descend' | 'Ascend')
+	if State == 'Descend' then
+		LayerService.CurrentLayer += 1
+	elseif State == 'Ascend' then
+		LayerService.CurrentLayer -= 1
+	end
+	Terrain:SetMaterialColor(Enum.Material.Grass, LayerInfo.Layers[LayerService.CurrentLayer].GrassColor)
+end)
+
+function LayerService:CreateChunk(Offset_CFrame: CFrame?)
+	
+	local Targets = {}
+	local CenterCf = nil
+	
+	task.desynchronize()
+
+	for x = -chunk_size, chunk_size do
+		for z = -chunk_size, chunk_size do
+			local height = math.noise(x/resolution*frequency, z/resolution*frequency) * amplification * cell_size
+			local Cf = CFrame.new(x * cell_size, height, z * cell_size)
+
+			if Offset_CFrame then
+				Cf *= Offset_CFrame
+			end
+			
+			table.insert(Targets, Cf)
+			
+			if x == 0 and z == 0 then
+				CenterCf = Cf
+			end
 		end
 	end
-end
-
-function CombatService:Init(Object, SpawnPosition: Vector3?) --// SpawnPosition in case enemy is being initialised
-	local self = setmetatable({}, CombatService)
-	--// Declare stats
-	self.Combo = 0
-	self.Object = Object
-	self.Posture = 0
-	self.LastHit = 0
-	self.Feinted = false
-	self.Attacking = false
-	self.Blocking = false
-	self.Parrying = false
 	
-	local ParentDetector: RBXScriptConnection = nil
-	local HumanoidDeathDetector: RBXScriptConnection = nil
-	local HuntTask = nil
+	task.synchronize()
 	
-	--// Check if an enemy is being registered
-	if Object:GetAttribute('Enemy') then
-		--// Store weapon which will be used in self for future reference
-		self.Weapon = CachedEnemyData[Object.Name].Weapon
-		if SpawnPosition then
-			Object:PivotTo(CFrame.new(SpawnPosition))
+	local LastTick = tick()
+	for _, v in pairs(Targets) do
+		Terrain:FillBlock(v, Vector3.new(cell_size, cell_size, cell_size), Enum.Material.Grass)
+		if tick() - LastTick > 0.02 then
+			task.wait()
+			LastTick = tick()
 		end
-		Object.Parent = workspace
-		--// Make enemy act on its own
-		HuntTask = task.spawn(function()
-			--// Every half second check if someone is in detection range
-			while task.wait(.5) do
-				for _, v in Players:GetPlayers() do
-					--// If someone is within detection range then lock onto them until they're dead
-					if (Object.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude < CachedEnemyData[Object.Name].DetectionRange then
-						local Character = v.Character
-						--// If they're close enough then attack, if they're not BUT they're still within detection range then go to them, if both scenarios aren't happening then chill out
-						repeat
-							if (Object.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude < CachedWeaponData[self.Weapon].Range + 2 then
-								self:Attack()
-							elseif (Object.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude < CachedEnemyData[Object.Name].DetectionRange then
-								Object.Humanoid:MoveTo(Character.HumanoidRootPart.Position)
-							else
-								break
-							end
-							task.wait(.1)
-						until Character.Humanoid.Health == 0
-					end
-				end
-			end
-		end)
-	else
-		--// Not enemy, instead store player in self for future reference
-		self.Player = Players:GetPlayerFromCharacter(Object)
 	end
 	
-	--// Wipe object from CombatData if destroyed unexpectedly
-	ParentDetector = Object.AncestryChanged:Connect(function()
-		if Object.Parent == nil then
-			--// If is enemy then stop hunting players
-			if Object:GetAttribute('Enemy') then
-				task.cancel(HuntTask)
-			end
-			CombatData[Object] = nil
-			--// Disconnect connections to prevent memory leak
-			HumanoidDeathDetector:Disconnect()
-			ParentDetector:Disconnect()
-		end
-	end)
+	local self = setmetatable({}, LayerService)
+	self.Id = HttpService:GenerateGUID(false)
+	self.PresentPlayers = {}
+	self.Enemies = {}
 	
-	--// Wipe object from CombatData upon death of its humanoid
-	HumanoidDeathDetector = Object.Humanoid.Died:Once(function()
-		CombatData[Object] = nil
-		--// If is enemy then stop hunting players and create cool fading away effect
-		if Object:GetAttribute('Enemy') then
-			task.cancel(HuntTask)
-			for _, v in Object:GetChildren() do
-				if v:IsA('BasePart') then
-					local tween = TweenService:Create(v, TweenInfo.new(5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {Transparency = 1})
-					tween:Play()
-				end
-			end
-			task.wait(5)
-			Object:Destroy()
-		end
-		--// Disconnect connections to prevent memory leak
-		ParentDetector:Disconnect()
-		HumanoidDeathDetector:Disconnect()
-	end)
+	local CenterPart = Instance.new('Part')
+	CenterPart.Name = self.Id
+	CenterPart.Anchored = true
+	CenterPart.Size = Vector3.new(chunk_size * 6, 50, chunk_size * 6)
+	CenterPart.CFrame = CenterCf
+	CenterPart.Transparency = 1
+	CenterPart.CanCollide = false
+	CenterPart.CastShadow = false
+	CenterPart.Parent = workspace.Chunks
+	self.CenterPart = CenterPart
 	
-	--// Passively decrease posture 
-	task.spawn(function()
-		if self.Posture > 0 then
-			--// math.clamp to keep strictly within 0 - 100 range, wouldn't want it to go into negative numbers
-			self.Posture = math.clamp(self.Posture - 5, 0, 100)
-		end
-		task.wait(1)
-	end)
+	task.synchronize()
 	
-	--// Store self in CombatData to be able to retrieve state
-	CombatData[Object] = self
+	print('created chunk '..self.Id)
 
+	Chunks[self.Id] = self
+
+	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
+		--// RNG check for event
+		if seed:NextInteger(1, 100) <= v.Chance then
+			local RandomPosition = Vector3.new(math.random(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, math.random(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+			local asset: Model = v.Asset:Clone()
+			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0)))
+			asset.Parent = workspace
+		end
+	end
+	
+	--// RNG check for enemies
+	if seed:NextInteger(1, 4) == 1 then
+		--// RNG check for how many enemies to spawn
+		for i = 1, seed:NextInteger(1, 2), 1 do
+			local RandomPosition = Vector3.new(math.random(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
+				3,
+				math.random(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+			ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerInfo.Layers[LayerService.CurrentLayer].Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition)
+		end
+	end
+	
 	return self
 end
 
-function CombatService:Attack(HitObjects)
-	
-	local function Reject(Reason: string)
-		warn(`CombatService rejected attack request from {self.Object:GetFullName()} {self.Player and self.Player.UserId or '(Enemy)'}: {Reason}`)
-		self.Attacking = false
-	end
-	
-	--// Get weapon from the attacker
-	local Weapon = LocateWeapon(self.Object) or self.Weapon
-	
-	--// Check if actually capable of attacking and everything is as should be
-	if Weapon and not self.Attacking and not self.Blocking and not self.Parrying and self.Posture < 100 then
-		
-		self.Attacking = true
-		
-		--// Declare relevant info here in simpler terms to not make this a mess
-		local RelevantWeapon = CachedWeaponData[Weapon.Name] or CachedWeaponData[self.Weapon]
-		local WeaponTotalSwing = RelevantWeapon.SwingTime + RelevantWeapon.Endlag
-		local RelevantAnimations = require(ReplicatedStorage.Assets.CombatInfo[RelevantWeapon.Name])
-		
-		--// Check if combo should've reset due to having attacked again too late
-		if tick() - self.LastHit > RelevantWeapon.ComboWaitPeriod then
-			self.Combo = 0
-		end
-		
-		--// Add addtional wait time for finishing a combo
-		if self.Combo == 4 then
-			WeaponTotalSwing += RelevantWeapon.ComboWaitPeriod
-		end
-		
-		--// +.15 for leniency
-		if (tick() - self.LastHit + .15) < WeaponTotalSwing then
-			Reject('would attack too fast')
-			return
-		end
-		
-		--// Allow for combo to increase if is smaller than or equal to 4
-		if self.Combo <= 4 then
-			self.Combo += 1
-		end
-		
-		--// If attacker is enemy then make the server do animations for enemy as it can't play animations for itself unlike the player
-		if self.Object:GetAttribute('Enemy') then
-			if self.Combo == 1 then
-				AnimationsService:PlayAnimation(self.Object, RelevantAnimations.Animations.Swing1, 'Swing1')
-			elseif self.Combo == 2 then
-				AnimationsService:StopAnimation(self.Object, 'Swing1')
-				AnimationsService:PlayAnimation(self.Object, RelevantAnimations.Animations.Swing2, 'Swing2')
-			elseif self.Combo == 3 then
-				AnimationsService:StopAnimation(self.Object, 'Swing2')
-				AnimationsService:PlayAnimation(self.Object, RelevantAnimations.Animations.Swing3, 'Swing3')
-			elseif self.Combo == 4 then
-				AnimationsService:StopAnimation(self.Object, 'Swing3')
-				AnimationsService:PlayAnimation(self.Object,RelevantAnimations.Animations.Swing4, 'Swing4')
+function LayerService:DeleteChunk(id: string)
+	local Chunk = Chunks[id]
+	if Chunk then
+		for _, v in pairs(workspace:GetPartsInPart(Chunk.CenterPart)) do
+			if v.Parent and v.Parent.Name ~= 'Workspace' then
+				v.Parent:Destroy()
 			end
 		end
-		
-		--// Wait before actually checking hits
-		task.wait(RelevantWeapon.SwingTime / 2)
-		
-		--// If enemy then get hitboxes, as there are none yet
-		if not HitObjects then
-			HitObjects = HitboxService:Hitbox(Vector3.new(RelevantWeapon.Range, RelevantWeapon.Range, RelevantWeapon.Range), self.Object.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4), self.Object)
+		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
+		Chunk.CenterPart:Destroy()
+		Chunks[id] = nil
+		print('deleted chunk '..id)
+	end
+end
+
+function LayerService:GetAvailableAdjacentCFrames(id: string)
+	local results = {}
+	local Chunk = Chunks[id]
+	
+	local targets = {
+		left = Chunk.CenterPart.CFrame * CFrame.new(0, 0, -chunk_size * 6),
+		front = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, 0),
+		right = Chunk.CenterPart.CFrame * CFrame.new(0, 0, chunk_size * 6),
+		back = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, 0),
+		back_left = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, -chunk_size * 6),
+		back_right = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, chunk_size * 6),
+		front_left = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, -chunk_size * 6),
+		front_right = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, chunk_size * 6)
+	}
+	
+	for _, v in pairs(targets) do
+		local overlaps = workspace:GetPartBoundsInBox(v, Vector3.one)
+		if #overlaps == 0 then
+			table.insert(results, v)
 		end
+	end
+	
+	return results
+end
+
+function LayerService:CreateEligibleAdjacentChunks()
+	for _, Chunk in pairs(Chunks) do
+		local results = LayerService:GetAvailableAdjacentCFrames(Chunk.Id)
 		
-		if not self.Feinted then
-			--// For each model that was in the hitbox check its status and continue accordingly
-			for _, v in ipairs(HitObjects) do
-				--// Sanity check
-				if (self.Object:GetPivot().Position - v.HumanoidRootPart.Position).Magnitude < RelevantWeapon.Range + 2.8 and CombatData[v] then
-					if CombatData[v].Parrying then
-						AudioService:CreateSound(SoundService.Weapons.Combat.Parry, v)
-						--// If attacker is player then let player know that they were parried, let them handle animation. Otherwise play animation for enemy
-						if self.Player then
-							Events.Parried:FireClient(self.Player)
-						else
-							AnimationsService:PlayAnimation(v, Animations.Combat.Parried, 'Parried')
-						end
-						--// Attacker was parried, reset combo and wait 1.2s before being able to do anything as punishment
-						self.Combo = 0
-						task.wait(1.2)
-					elseif CombatData[v].Blocking then
-						AudioService:CreateSound(SoundService.Weapons.Combat.Block, v)
-						CombatData[v].Posture += RelevantWeapon.PostureDamage
-						--// Check if v's posture is large enough for a guardbreak
-						if CombatData[v].Posture >= 100 then
-							v.Humanoid:TakeDamage(RelevantWeapon.Damage)
-							AudioService:CreateSound(SoundService.Weapons.Combat.Guardbreak, v)
-							--// If v is a player then let them know they were guardbroken, let them handle animation. Otherwise play animation for enemy
-							if CombatData[v].Player then
-								Events.GuardbrokenEvent:FireClient(CombatData[v].Player)
-							else
-								AnimationsService:PlayAnimation(v, Animations.Combat.Guardbroken, 'Guardbroken')
-							end
-							CombatData[v].Blocking = false
-							task.wait(1.3)
-							AnimationsService:StopAnimation(v, 'Guardbroken')
-							CombatData[v].Posture = 0
-						end
-					else
-						--// Idle, can safely deal damage
-						v.Humanoid:TakeDamage(RelevantWeapon.Damage)
-						AudioService:CreateSound(game.SoundService.Weapons[RelevantWeapon.Name].Hit, v)
-						local RandomNumber = math.random(1, 2)
-						if RandomNumber == 1 then
-							AnimationsService:StopAnimation(v, 'Damaged2')
-							AnimationsService:PlayAnimation(v,Animations.Combat.Damaged1, 'Damaged1')
-						else
-							AnimationsService:StopAnimation(v, 'Damaged1')
-							AnimationsService:PlayAnimation(v, Animations.Combat.Damaged2, 'Damaged2')
-						end
-					end
-				else
-					Reject('Too far or target not found in CombatData')
-					return
+		for _, Player in Players:GetPlayers() do
+			for _, v in pairs(results) do
+				if (v.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * render_distance then
+					LayerService:CreateChunk(v)
 				end
 			end
-		else
-			AudioService:CreateSound(SoundService.Weapons.Combat.Feint, self.Object)
-			return
 		end
-			
-		self.LastHit = tick()
-		self.Attacking = false
-		
-		--// If is equal to or above 5 then reset to 0
-		if self.Combo >= 5 then
-			self.Combo = 0
-		end
-	else
-		Reject('Not holding weapon or occupied or staggered')
-		return
 	end
 end
 
-function CombatService:Block(state: 'Start' | 'End')
+function LayerService:WipeIrrelevantChunks()
+	local IrrelevantChunks = {}
 	
-	local function Reject(Reason: string)
-		warn(`CombatService rejected block request from {self.Object:GetFullName()} {self.Player and self.Player.UserId or '(Enemy)'}: {Reason}`)
-		self.Attacking = false
-	end
+	task.desynchronize()
 	
-	--// Get weapon from the attacker
-	local Weapon = LocateWeapon(self.Object) or self.Weapon
-	
-	--// Declare relevant info here in simpler terms to not make this a mess
-	local RelevantWeapon = CachedWeaponData[Weapon.Name] or CachedWeaponData[self.Weapon]
-	
-	if state == 'Start' then
-		--// Check if actually capable of blocking and everything is as should be
-		if Weapon and not self.Attacking and not self.Blocking and not self.Parrying and self.Posture < 100 then
-			self.Parrying = true
-			task.wait(RelevantWeapon.ParryWindow)
-			--// Check if still blocking, if so turn state into blocking
-			if self.Parrying then
-				self.Blocking = true
-				self.Parrying = false
+	for _, v in pairs(Chunks) do
+		local Preserve = false
+
+		for _, Player in Players:GetPlayers() do
+			if (v.CenterPart.CFrame.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * (render_distance * 1.3) then
+				Preserve = true
+				break
 			end
-		else
-			Reject('Not holding weapon or occupied or guardbroken')
-			return
 		end
-		
-	elseif state == 'End' then
-		self.Parrying = false
-		self.Blocking = false
+
+		if Preserve == false then
+			table.insert(IrrelevantChunks, v.Id)
+		end
+	end
+	
+	task.synchronize()
+	
+	for _, v in pairs(IrrelevantChunks) do
+		LayerService:DeleteChunk(v)
 	end
 end
 
-function CombatService:Feint()
-	--// Check if actually capable of feinting and everything is as should be
-	if self.Attacking == true and not self.Feinted and not self.Blocking and not self.Parrying then
-		self.Feinted = true
-		self.Attacking = false
-		task.wait(.3)
-		self.Feinted = false
+function LayerService:WipeAllChunks()
+	for _,v in pairs(Chunks) do
+		LayerService:DeleteChunk(v.Id)
 	end
 end
 
-return CombatService
+return LayerService
