@@ -25,6 +25,7 @@ local chunk_size = 64
 local resolution = 20
 local frequency = 2
 local amplification = 2
+local center_size = chunk_size * 6
 local seed = Random.new()
 
 local render_distance = 15
@@ -79,7 +80,7 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	local CenterPart = Instance.new('Part')
 	CenterPart.Name = self.Id
 	CenterPart.Anchored = true
-	CenterPart.Size = Vector3.new(chunk_size * 6, 50, chunk_size * 6)
+	CenterPart.Size = Vector3.new(center_size, 50, chunk_size * center_size)
 	CenterPart.CFrame = CenterCf
 	CenterPart.Transparency = 1
 	CenterPart.CanCollide = false
@@ -137,14 +138,14 @@ function LayerService:GetAvailableAdjacentCFrames(id: string)
 	local Chunk = Chunks[id]
 	
 	local targets = {
-		left = Chunk.CenterPart.CFrame * CFrame.new(0, 0, -chunk_size * 6),
-		front = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, 0),
-		right = Chunk.CenterPart.CFrame * CFrame.new(0, 0, chunk_size * 6),
-		back = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, 0),
-		back_left = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, -chunk_size * 6),
-		back_right = Chunk.CenterPart.CFrame * CFrame.new(-chunk_size * 6, 0, chunk_size * 6),
-		front_left = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, -chunk_size * 6),
-		front_right = Chunk.CenterPart.CFrame * CFrame.new(chunk_size * 6, 0, chunk_size * 6)
+		left = Chunk.CenterPart.CFrame * CFrame.new(0, 0, -center_size * 6),
+		front = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, 0),
+		right = Chunk.CenterPart.CFrame * CFrame.new(0, 0, center_size),
+		back = Chunk.CenterPart.CFrame * CFrame.new(-center_size, 0, 0),
+		back_left = Chunk.CenterPart.CFrame * CFrame.new(-center_size, 0, -center_size),
+		back_right = Chunk.CenterPart.CFrame * CFrame.new(-center_size, 0, center_size),
+		front_left = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, -center_size),
+		front_right = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, center_size)
 	}
 	
 	for _, v in pairs(targets) do
@@ -213,13 +214,38 @@ function LayerService:GetAmountOfChunks()
 	return amount
 end
 
-function LayerService:GetChunkFromCFrame(Cf: CFrame)
-	local result = workspace:GetPartBoundsInBox(Cf, Vector3.new(0.01, 0.01, 0.01))
+function LayerService:GetChunkFromPosition(Position: Vector3)
+	local result = workspace:GetPartBoundsInBox(CFrame.new(Position), Vector3.new(0.01, 0.01, 0.01))
+
 	for _, v in pairs(Chunks) do
 		if table.find(result, v.CenterPart) then
 			return v
 		end
 	end
+end
+
+function LayerService:GetChunkFromCFrame(Cf: CFrame)
+	local result = workspace:GetPartBoundsInBox(Cf, Vector3.new(0.01, 0.01, 0.01))
+	
+	for _, v in pairs(Chunks) do
+		if table.find(result, v.CenterPart) then
+			return v
+		end
+	end
+end
+
+function WipeChunkEnemies(id: string)
+	local result = workspace:GetPartBoundsInBox(Chunks[id].CenterPart.CFrame, Vector3.new(center_size, center_size, center_size))
+	
+	for _, v in pairs(result) do
+		if v:GetAttribute('Enemy') then
+			v:Destroy()
+		end
+	end
+end
+
+function GetLayerInfo(index)
+	return LayerInfo.Layers[index]
 end
 
 return LayerService
