@@ -7,6 +7,7 @@ local HttpService = game:GetService('HttpService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local Players = game:GetService('Players')
 local ServerScriptService = game:GetService('ServerScriptService')
+local CollectionService = game:GetService('CollectionService')
 
 --// Variables
 local Terrain = workspace.Terrain
@@ -105,6 +106,7 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 					--// Move to a random position within chunk + up depending on how tall the asset is
 					asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0)))
 					asset.Parent = self.CenterPart
+					CollectionService:AddTag(asset, asset.Name)
 				end
 			end
 
