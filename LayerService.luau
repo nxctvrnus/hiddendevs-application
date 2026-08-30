@@ -14,7 +14,6 @@ local Terrain = workspace.Terrain
 local Enemies = ReplicatedStorage.Assets.Enemies
 local Events = ReplicatedStorage.Events
 
-local CombatService = require(ServerScriptService.Combat.CombatService)
 local LayerInfo = require(script.LayerInfo)
 
 local Chunks = {}
