@@ -119,8 +119,10 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 					ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerService:GetLayerInfo(LayerService.CurrentLayer).Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition)
 				end
 			end
-
+			
 			print(`LayerService - finished preparing Chunk {self.Id}`)
+			
+			return self
 		end)
 		
 		if success then
@@ -129,8 +131,6 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 			task.wait(.2)
 		end
 	end
-	
-	return self
 end
 
 function LayerService:DeleteChunk(id: string)
