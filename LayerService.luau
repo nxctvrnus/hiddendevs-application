@@ -87,8 +87,6 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	CenterPart.CastShadow = false
 	CenterPart.Parent = workspace.Chunks
 	self.CenterPart = CenterPart
-	
-	task.synchronize()
 
 	Chunks[self.Id] = self
 
@@ -113,17 +111,22 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 		end
 	end
 	
+	print(`LayerService - finished preparing Chunk {self.Id}`)
+	
 	return self
 end
 
 function LayerService:DeleteChunk(id: string)
 	local Chunk = Chunks[id]
+	
 	if Chunk then
 		LayerService:WipeChunkEnemies(id)
 		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
 		Chunk.CenterPart:Destroy()
 		Chunks[id] = nil
 	end
+	
+	print(`LayerService - finished deleting Chunk {self.Id}`)
 end
 
 function LayerService:GetAvailableAdjacentCFrames(id: string)
