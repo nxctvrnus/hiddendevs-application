@@ -31,14 +31,10 @@ local render_distance = 15
 
 LayerService.CurrentLayer = 1
 
-Events.Environment.ChangeLayer.Event:Connect(function(State: 'Descend' | 'Ascend')
-	if State == 'Descend' then
-		LayerService.CurrentLayer += 1
-	elseif State == 'Ascend' then
-		LayerService.CurrentLayer -= 1
-	end
+function LayerService:SetLayer(NewLayer)
+	LayerService.CurrentLayer = NewLayer
 	Terrain:SetMaterialColor(Enum.Material.Grass, LayerInfo.Layers[LayerService.CurrentLayer].GrassColor)
-end)
+end
 
 function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	
@@ -163,10 +159,9 @@ end
 
 function LayerService:CreateEligibleAdjacentChunks()
 	for _, Chunk in pairs(Chunks) do
-		local results = LayerService:GetAvailableAdjacentCFrames(Chunk.Id)
 		
 		for _, Player in Players:GetPlayers() do
-			for _, v in pairs(results) do
+			for _, v in pairs(LayerService:GetAvailableAdjacentCFrames(Chunk.Id)) do
 				if (v.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * render_distance then
 					LayerService:CreateChunk(v)
 				end
@@ -203,8 +198,27 @@ function LayerService:WipeIrrelevantChunks()
 end
 
 function LayerService:WipeAllChunks()
-	for _,v in pairs(Chunks) do
+	for _, v in pairs(Chunks) do
 		LayerService:DeleteChunk(v.Id)
+	end
+end
+
+function LayerService:GetAmountOfChunks()
+	local amount = 0
+	
+	for _, v in pairs(Chunks) do
+		amount += 1
+	end
+	
+	return amount
+end
+
+function LayerService:GetChunkFromCFrame(Cf: CFrame)
+	local result = workspace:GetPartBoundsInBox(Cf, Vector3.new(0.01, 0.01, 0.01))
+	for _, v in pairs(Chunks) do
+		if table.find(result, v.CenterPart) then
+			return v
+		end
 	end
 end
 
