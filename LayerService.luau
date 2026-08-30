@@ -80,7 +80,7 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	local CenterPart = Instance.new('Part')
 	CenterPart.Name = self.Id
 	CenterPart.Anchored = true
-	CenterPart.Size = Vector3.new(center_size, 50, chunk_size * center_size)
+	CenterPart.Size = Vector3.new(center_size, 50, center_size)
 	CenterPart.CFrame = CenterCf
 	CenterPart.Transparency = 1
 	CenterPart.CanCollide = false
@@ -89,28 +89,26 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	self.CenterPart = CenterPart
 	
 	task.synchronize()
-	
-	print('created chunk '..self.Id)
 
 	Chunks[self.Id] = self
 
 	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
-		--// RNG check for event
+		--// RNG check for whether event related asset will spawn
 		if seed:NextInteger(1, 100) <= v.Chance then
-			local RandomPosition = Vector3.new(math.random(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, math.random(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
 			local asset: Model = v.Asset:Clone()
 			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0)))
 			asset.Parent = workspace
 		end
 	end
 	
-	--// RNG check for enemies
+	--// RNG check for whether enemies will spawn
 	if seed:NextInteger(1, 4) == 1 then
 		--// RNG check for how many enemies to spawn
 		for i = 1, seed:NextInteger(1, 2), 1 do
-			local RandomPosition = Vector3.new(math.random(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
+			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
 				3,
-				math.random(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+				seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
 			ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerInfo.Layers[LayerService.CurrentLayer].Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition)
 		end
 	end
@@ -129,7 +127,6 @@ function LayerService:DeleteChunk(id: string)
 		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
 		Chunk.CenterPart:Destroy()
 		Chunks[id] = nil
-		print('deleted chunk '..id)
 	end
 end
 
@@ -230,6 +227,16 @@ function LayerService:GetChunkFromCFrame(Cf: CFrame)
 	for _, v in pairs(Chunks) do
 		if table.find(result, v.CenterPart) then
 			return v
+		end
+	end
+end
+
+function GetChunkEnemies(id: string)
+	local result = workspace:GetPartBoundsInBox(Chunks[id].CenterPart.CFrame, Vector3.new(center_size, center_size, center_size))
+
+	for _, v in pairs(result) do
+		if v:GetAttribute('Enemy') then
+			v:Destroy()
 		end
 	end
 end
