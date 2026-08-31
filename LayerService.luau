@@ -1,17 +1,14 @@
---// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914
---// this is a chunk manager module
+--// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914 | this is a chunk manager module
 local LayerService = {}
 
 LayerService.__index = LayerService
 
---// Services
 local HttpService = game:GetService('HttpService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local Players = game:GetService('Players')
 local ServerScriptService = game:GetService('ServerScriptService')
 local CollectionService = game:GetService('CollectionService')
 
---// Variables
 local Terrain = workspace.Terrain
 local Enemies = ReplicatedStorage.Assets.Enemies
 local Events = ReplicatedStorage.Events
@@ -26,13 +23,11 @@ local chunk_size = 64
 local resolution = 20
 local frequency = 2
 local amplification = 2
+local render_distance = 15
 
 local center_size = chunk_size * 6
 local seed = Random.new()
 
-local render_distance = 15
-
---// Made not local to make script responsible for environment be able to see this
 LayerService.CurrentLayer = 1
 
 function LayerService:SetLayer(NewLayer)
@@ -49,7 +44,6 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 
 	for x = -chunk_size, chunk_size do
 		for z = -chunk_size, chunk_size do
-			--// i mean this is just perlin noise math what do you want me to say
 			local height = math.noise(x/resolution*frequency, z/resolution*frequency) * amplification * cell_size
 			--// Multiply by cell_size to not have everything mashed into a mess
 			local Cf = CFrame.new(x * cell_size, height, z * cell_size)
