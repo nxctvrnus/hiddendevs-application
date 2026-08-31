@@ -1,5 +1,4 @@
---// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914 | this is a chunk manager module
-local LayerService = {}
+local LayerService = {} --// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914 | this is a chunk manager module
 
 LayerService.__index = LayerService
 
