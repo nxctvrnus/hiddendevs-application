@@ -128,7 +128,9 @@ function LayerService:DeleteChunk(id: string)
 	
 	if Chunk then
 		LayerService:WipeChunkEnemies(Chunk.Id)
+		--// + Vector3.new(4,4,4) just to make sure everything is actually wiped
 		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
+		--// No need to handle event asset deletion on its own, they are parented to CenterPart anyway
 		Chunk.CenterPart:Destroy()
 		Chunks[id] = nil
 	end
