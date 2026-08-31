@@ -35,75 +35,89 @@ function LayerService:SetLayer(NewLayer)
 end
 
 function LayerService:CreateChunk(Offset_CFrame: CFrame?)
-	local Targets = {} --// Gonna have to prepare these in advance since we're going to desync
-	local CenterCf = nil
+	for i = 1, 4, 1 do
+		local success, error = pcall(function()
+			local Targets = {} --// Gonna have to prepare these in advance since we're going to desync
+			local CenterCf = nil
 
-	task.desynchronize()
+			task.desynchronize()
 
-	for x = -chunk_size, chunk_size do
-		for z = -chunk_size, chunk_size do
-			local height = math.noise(x/resolution*frequency, z/resolution*frequency) * amplification * cell_size
-			local Cf = CFrame.new(x * cell_size, height, z * cell_size) --// Multiply by cell_size to not have everything mashed into a mess
+			for x = -chunk_size, chunk_size do
+				for z = -chunk_size, chunk_size do
+					local height = math.noise(x/resolution*frequency, z/resolution*frequency) * amplification * cell_size
+					local Cf = CFrame.new(x * cell_size, height, z * cell_size)
 
-			if Offset_CFrame then
-				Cf *= Offset_CFrame
+					if Offset_CFrame then
+						Cf *= Offset_CFrame
+					end
+
+					table.insert(Targets, Cf)
+
+					if x == 0 and z == 0 then
+						CenterCf = Cf
+					end
+				end
 			end
 
-			table.insert(Targets, Cf)
+			task.synchronize()
 
-			if x == 0 and z == 0 then
-				CenterCf = Cf
+			local LastTick = tick() --// Throttle to not delay generation too much but also keep fps fairly stable
+			for _, v in pairs(Targets) do
+				Terrain:FillBlock(v, Vector3.new(cell_size, cell_size, cell_size), Enum.Material.Grass)
+				if tick() - LastTick > 0.02 then
+					task.wait()
+					LastTick = tick()
+				end
 			end
+
+			local self = setmetatable({}, LayerService)
+			self.Id = HttpService:GenerateGUID(false)
+
+			local CenterPart = Instance.new('Part')
+			CenterPart.Name = self.Id
+			CenterPart.Anchored = true
+			CenterPart.Size = Vector3.new(center_size, 50, center_size)
+			CenterPart.CFrame = CenterCf
+			CenterPart.Transparency = 1
+			CenterPart.CanCollide = false
+			CenterPart.CastShadow = false
+			CenterPart.Parent = workspace.Chunks
+			self.CenterPart = CenterPart
+
+			Chunks[self.Id] = self
+
+			for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
+				if seed:NextInteger(1, 100) <= v.Chance then --// RNG check for whether event related asset will spawn
+					local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+					local asset: Model = v.Asset:Clone()
+					asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0))) --// Move to a random position within chunk + up depending on how tall the asset is
+					asset.Parent = self.CenterPart
+					CollectionService:AddTag(asset, asset.Name)
+				end
+			end
+
+			if seed:NextInteger(1, 4) == 1 then --// RNG check for whether enemies will spawn
+				for i = 1, seed:NextInteger(1, 2), 1 do --// RNG check for how many enemies to spawn
+					local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
+						3,
+						seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
+					ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerService:GetLayerInfo(LayerService.CurrentLayer).Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition) --// Must fire event and not directly interfere with enemy spawning to track combat data properly, also spawn random enemy from enemy pool of current layer
+				end
+			end
+
+			return self
+		end)
+		
+		if success then
+			print(`LayerService - finished preparing Chunk {self.Id}`)
+			break
+		else
+			if i == 4 then
+				warn(`LayerService - failed to create chunk`)
+			end
+			task.wait(.2)
 		end
 	end
-
-	task.synchronize()
-
-	local LastTick = tick() --// Throttle to not delay generation too much but also keep fps fairly stable
-	for _, v in pairs(Targets) do
-		Terrain:FillBlock(v, Vector3.new(cell_size, cell_size, cell_size), Enum.Material.Grass)
-		if tick() - LastTick > 0.02 then
-			task.wait()
-			LastTick = tick()
-		end
-	end
-
-	local self = setmetatable({}, LayerService)
-	self.Id = HttpService:GenerateGUID(false)
-
-	local CenterPart = Instance.new('Part')
-	CenterPart.Name = self.Id
-	CenterPart.Anchored = true
-	CenterPart.Size = Vector3.new(center_size, 50, center_size)
-	CenterPart.CFrame = CenterCf
-	CenterPart.Transparency = 1
-	CenterPart.CanCollide = false
-	CenterPart.CastShadow = false
-	CenterPart.Parent = workspace.Chunks
-	self.CenterPart = CenterPart
-
-	Chunks[self.Id] = self
-
-	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
-		if seed:NextInteger(1, 100) <= v.Chance then --// RNG check for whether event related asset will spawn
-			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
-			local asset: Model = v.Asset:Clone()
-			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0))) --// Move to a random position within chunk + up depending on how tall the asset is
-			asset.Parent = self.CenterPart
-			CollectionService:AddTag(asset, asset.Name)
-		end
-	end
-
-	if seed:NextInteger(1, 4) == 1 then --// RNG check for whether enemies will spawn
-		for i = 1, seed:NextInteger(1, 2), 1 do --// RNG check for how many enemies to spawn
-			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)), 3, seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
-			ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerService:GetLayerInfo(LayerService.CurrentLayer).Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition) --// Must fire event and not directly interfere with enemy spawning to track combat data properly, also spawn random enemy from enemy pool of current layer
-		end
-	end
-	
-	print(`LayerService - finished preparing Chunk {self.Id}`)
-	
-	return self
 end
 
 function LayerService:DeleteChunk(id: string)
@@ -226,6 +240,14 @@ end
 function LayerService:WipeChunkEnemies(id: string)
 	for _, v in pairs(LayerService:GetChunkEnemies(id)) do
 		v:Destroy()
+	end
+end
+
+function LayerService:ChunkExists(id: string)
+	if Chunks[id] then
+		return true
+	else
+		return false
 	end
 end
 
