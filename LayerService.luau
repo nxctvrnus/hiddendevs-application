@@ -36,8 +36,7 @@ function LayerService:SetLayer(NewLayer)
 end
 
 function LayerService:CreateChunk(Offset_CFrame: CFrame?)
-	--// Gonna have to prepare these in advance since we're going to desync
-	local Targets = {}
+	local Targets = {} --// Gonna have to prepare these in advance since we're going to desync
 	local CenterCf = nil
 
 	task.desynchronize()
@@ -45,8 +44,7 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	for x = -chunk_size, chunk_size do
 		for z = -chunk_size, chunk_size do
 			local height = math.noise(x/resolution*frequency, z/resolution*frequency) * amplification * cell_size
-			--// Multiply by cell_size to not have everything mashed into a mess
-			local Cf = CFrame.new(x * cell_size, height, z * cell_size)
+			local Cf = CFrame.new(x * cell_size, height, z * cell_size) --// Multiply by cell_size to not have everything mashed into a mess
 
 			if Offset_CFrame then
 				Cf *= Offset_CFrame
@@ -62,8 +60,7 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 
 	task.synchronize()
 
-	--// Throttle to not delay generation too much but also keep fps fairly stable
-	local LastTick = tick()
+	local LastTick = tick() --// Throttle to not delay generation too much but also keep fps fairly stable
 	for _, v in pairs(Targets) do
 		Terrain:FillBlock(v, Vector3.new(cell_size, cell_size, cell_size), Enum.Material.Grass)
 		if tick() - LastTick > 0.02 then
@@ -86,30 +83,24 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	CenterPart.Parent = workspace.Chunks
 	self.CenterPart = CenterPart
 
-	--// Store self via own GUID
 	Chunks[self.Id] = self
 
-	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
-		--// RNG check for whether event related asset will spawn
+	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do --// RNG check for whether event related asset will spawn
 		if seed:NextInteger(1, 100) <= v.Chance then
 			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)), 0, seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
 			local asset: Model = v.Asset:Clone()
-			--// Move to a random position within chunk + up depending on how tall the asset is
-			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0)))
+			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0))) --// Move to a random position within chunk + up depending on how tall the asset is
 			asset.Parent = self.CenterPart
 			CollectionService:AddTag(asset, asset.Name)
 		end
 	end
 
-	--// RNG check for whether enemies will spawn
-	if seed:NextInteger(1, 4) == 1 then
-		--// RNG check for how many enemies to spawn
-		for i = 1, seed:NextInteger(1, 2), 1 do
+	if seed:NextInteger(1, 4) == 1 then --// RNG check for whether enemies will spawn
+		for i = 1, seed:NextInteger(1, 2), 1 do --// RNG check for how many enemies to spawn
 			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
 				3,
 				seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
-			--// Must fire event and not directly interfere with enemy spawning to track combat data properly, also spawn random enemy from enemy pool of current layer
-			ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerService:GetLayerInfo(LayerService.CurrentLayer).Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition)
+			ReplicatedStorage.Events.Environment.SpawnEnemy:Fire(LayerService:GetLayerInfo(LayerService.CurrentLayer).Enemies[seed:NextInteger(1, #LayerInfo.Layers[LayerService.CurrentLayer].Enemies)], RandomPosition) --// Must fire event and not directly interfere with enemy spawning to track combat data properly, also spawn random enemy from enemy pool of current layer
 		end
 	end
 	
@@ -123,10 +114,8 @@ function LayerService:DeleteChunk(id: string)
 	
 	if Chunk then
 		LayerService:WipeChunkEnemies(Chunk.Id)
-		--// + Vector3.new(4,4,4) just to make sure everything is actually wiped
-		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air)
-		--// No need to handle event asset deletion on its own, they are parented to CenterPart anyway
-		Chunk.CenterPart:Destroy()
+		Terrain:FillBlock(Chunk.CenterPart.CFrame, Chunk.CenterPart.Size + Vector3.new(4, 4, 4), Enum.Material.Air) --// + Vector3.new(4,4,4) just to make sure everything is actually wiped
+		Chunk.CenterPart:Destroy() --// No need to handle event asset deletion on its own, they are parented to CenterPart anyway
 		Chunks[id] = nil
 	end
 	
@@ -137,7 +126,6 @@ function LayerService:GetAvailableAdjacentCFrames(id: string)
 	local results = {}
 	local Chunk = Chunks[id]
 	
-	--// Declare targets already to not make an unreadable mess in the for loop
 	local targets = {
 		left = Chunk.CenterPart.CFrame * CFrame.new(0, 0, -center_size * 6),
 		front = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, 0),
@@ -147,10 +135,9 @@ function LayerService:GetAvailableAdjacentCFrames(id: string)
 		back_right = Chunk.CenterPart.CFrame * CFrame.new(-center_size, 0, center_size),
 		front_left = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, -center_size),
 		front_right = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, center_size)
-	}
+	} --// Declare targets already to not make an unreadable mess in the for loop
 	
-	--// Check whether there is already a CenterPart in GetPartBoundsInBox
-	for _, v in pairs(targets) do
+	for _, v in pairs(targets) do --// Check whether there is already a CenterPart in GetPartBoundsInBox
 		local overlaps = workspace:GetPartBoundsInBox(v, Vector3.one)
 		if #overlaps == 0 then
 			table.insert(results, v)
@@ -165,8 +152,7 @@ function LayerService:CreateEligibleAdjacentChunks()
 		
 		for _, Player in Players:GetPlayers() do
 			for _, v in pairs(LayerService:GetAvailableAdjacentCFrames(Chunk.Id)) do
-				--// Check available spots which are within distance of chunk_size and the render distance
-				if (v.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * render_distance then
+				if (v.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * render_distance then --// Check available spots which are within distance of chunk_size and the render distance
 					LayerService:CreateChunk(v)
 				end
 			end
@@ -178,8 +164,7 @@ function LayerService:WipeIrrelevantChunks()
 	for _, v in pairs(Chunks) do
 		local Preserve = false
 
-		--// Must confirm that EVERY player is not within range
-		for _, Player in Players:GetPlayers() do
+		for _, Player in Players:GetPlayers() do --// Must confirm that EVERY player is not within range
 			if (v.CenterPart.CFrame.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * (render_distance * 1.3) then
 				Preserve = true
 				break
@@ -222,8 +207,7 @@ end
 function LayerService:GetChunkFromCFrame(Cf: CFrame)
 	local result = workspace:GetPartBoundsInBox(Cf, Vector3.new(0.01, 0.01, 0.01))
 	
-	--// Look through chunks which one's CenterPart is in results
-	for _, v in pairs(Chunks) do
+	for _, v in pairs(Chunks) do --// Look through chunks which one's CenterPart is in results
 		if table.find(result, v.CenterPart) then
 			return v
 		end
