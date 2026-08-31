@@ -244,11 +244,7 @@ function LayerService:WipeChunkEnemies(id: string)
 end
 
 function LayerService:ChunkExists(id: string)
-	if Chunks[id] then
-		return true
-	else
-		return false
-	end
+	if Chunks[id] then return true else return false end
 end
 
 function LayerService:GetLayerInfo(index)
