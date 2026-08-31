@@ -240,11 +240,19 @@ function LayerService:WipeChunkEnemies(id: string)
 	end
 end
 
+function LayerService:GetPlayerChunk(player: Player)
+	if player.Character then
+		return LayerService:GetChunkFromCFrame(player.Character.HumanoidRootPart.CFrame)
+	else
+		warn(`LayerService - Cannot get chunk of {player.Name}, missing character`)
+	end
+end
+
 function LayerService:ChunkExists(id: string)
 	if Chunks[id] then return true else return false end
 end
 
-function LayerService:GetLayerInfo(index)
+function LayerService:GetLayerInfo(index: number)
 	return LayerInfo.Layers[index]
 end
 
