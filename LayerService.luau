@@ -85,12 +85,17 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 
 	for _, v in pairs(LayerInfo.Layers[LayerService.CurrentLayer].LayerEvents) do
 		if seed:NextInteger(1, 100) <= v.Chance then --// RNG check for whether event related asset will spawn
-			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)),
+			local RandomPosition = Vector3.new(
+			seed:NextInteger(-math.floor(CenterPart.Size.X), math.floor(CenterPart.Size.X)),
 			0,
 			seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
 
 			local asset: Model = v.Asset:Clone()
-			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(0, asset:GetExtentsSize().Y, 0))) --// Move to a random position within chunk + up depending on how tall the asset is
+			asset:PivotTo(CFrame.new(self.CenterPart.Position + RandomPosition + Vector3.new(
+			0,
+			asset:GetExtentsSize().Y,
+			0))) --// Move to a random position within chunk + up depending on how tall the asset is
+
 			asset.Parent = self.CenterPart
 			CollectionService:AddTag(asset, asset.Name)
 		end
@@ -98,7 +103,8 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 
 	if seed:NextInteger(1, 4) == 1 then --// RNG check for whether enemies will spawn
 		for i = 1, seed:NextInteger(1, 2), 1 do --// RNG check for how many enemies to spawn
-			local RandomPosition = Vector3.new(seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
+			local RandomPosition = Vector3.new(
+			seed:NextInteger(-math.floor(CenterPart.Size.X),math.floor(CenterPart.Size.X)),
 			3,
 			seed:NextInteger(-math.floor(CenterPart.Size.Z), math.floor(CenterPart.Size.Z)))
 
