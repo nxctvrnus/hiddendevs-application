@@ -36,7 +36,7 @@ end
 
 function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 	for i = 1, 4, 1 do
-		local success, error = pcall(function()
+		local success, err = pcall(function()
 			local Targets = {} --// Gonna have to prepare these in advance since we're going to desync
 			local CenterCf = nil
 
@@ -105,11 +105,12 @@ function LayerService:CreateChunk(Offset_CFrame: CFrame?)
 				end
 			end
 
+			print(`LayerService - finished preparing Chunk {self.Id}`)
+
 			return self
 		end)
 		
 		if success then
-			print(`LayerService - finished preparing Chunk {self.Id}`)
 			break
 		else
 			if i == 4 then
