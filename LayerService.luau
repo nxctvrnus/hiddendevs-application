@@ -1,4 +1,5 @@
-local LayerService = {} --// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914 | this is a chunk manager module
+--// made by: discord - sunrvtcxn 1136228276172501043, roblox - nxctvrnus 446408914 | this is a chunk manager module
+local LayerService = {}
 
 LayerService.__index = LayerService
 
@@ -145,8 +146,8 @@ function LayerService:GetAvailableAdjacentCFrames(id: string)
 		front_right = Chunk.CenterPart.CFrame * CFrame.new(center_size, 0, center_size)
 	} --// Declare targets already to not make an unreadable mess in the for loop
 	
-	for _, v in pairs(targets) do --// Check whether there is already a CenterPart in GetPartBoundsInBox
-		local overlaps = workspace:GetPartBoundsInBox(v, Vector3.one)
+	for _, v in pairs(targets) do
+		local overlaps = workspace:GetPartBoundsInBox(v, Vector3.one) --// Check whether there is already a CenterPart in overlaps
 		if #overlaps == 0 then
 			table.insert(results, v)
 		end
@@ -157,7 +158,6 @@ end
 
 function LayerService:CreateEligibleAdjacentChunks()
 	for _, Chunk in pairs(Chunks) do
-		
 		for _, Player in Players:GetPlayers() do
 			for _, v in pairs(LayerService:GetAvailableAdjacentCFrames(Chunk.Id)) do
 				if (v.Position - Player.Character.HumanoidRootPart.Position).Magnitude < chunk_size * render_distance then --// Check available spots which are within distance of chunk_size and the render distance
