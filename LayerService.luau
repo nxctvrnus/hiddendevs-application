@@ -193,8 +193,7 @@ end
 function LayerService:GetChunkFromPosition(Position: Vector3)
 	local result = workspace:GetPartBoundsInBox(CFrame.new(Position), Vector3.new(0.01, 0.01, 0.01))
 
-	--// Look through chunks which one's CenterPart is in results
-	for _, v in pairs(Chunks) do
+	for _, v in pairs(Chunks) do --// Look through chunks which one's CenterPart is in results
 		if table.find(result, v.CenterPart) then
 			return v
 		end
